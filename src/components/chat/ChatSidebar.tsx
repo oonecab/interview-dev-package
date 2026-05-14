@@ -129,6 +129,20 @@ export function ChatSidebar({ messages, onMessagesChange, onClose }: ChatSidebar
           queryClient.invalidateQueries({ queryKey: ['workOrders'] });
         }
 
+        const terminalMessages = results
+          .map((r) => r.terminalMessage)
+          .filter((message): message is string => Boolean(message));
+        if (terminalMessages.length > 0 && results.every((r) => r.success)) {
+          const terminalMsg: ChatDisplayMessage = {
+            id: nextId(),
+            role: 'assistant' as const,
+            content: terminalMessages.join('\n\n'),
+          };
+          currentMsgs = [...currentMsgs, terminalMsg];
+          onMessagesChange(currentMsgs);
+          return;
+        }
+
         // If all tools failed, stop
         const allFailed = results.every((r) => !r.success);
         if (allFailed) {
@@ -188,7 +202,7 @@ export function ChatSidebar({ messages, onMessagesChange, onClose }: ChatSidebar
   const canSend = inputText.trim().length > 0 && !sending;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* Header */}
       <div
         style={{
@@ -210,7 +224,7 @@ export function ChatSidebar({ messages, onMessagesChange, onClose }: ChatSidebar
       </div>
 
       {/* Messages area */}
-      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 8 }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: 8 }}>
         <WelcomeBubble />
         {messages.map((msg) => (
           <MessageBubble key={msg.id} msg={msg} />

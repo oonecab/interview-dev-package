@@ -46,7 +46,7 @@ export function AppShell() {
   const isDevicesPage = activePage === 'devices';
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
       <Header
         style={{
           display: 'flex',
@@ -82,7 +82,7 @@ export function AppShell() {
         </Button>
       </Header>
 
-      <Layout style={{ minHeight: 0 }}>
+      <Layout style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {isDevicesPage && (
           <Sider
             width={LEFT_SIDEBAR_WIDTH}
@@ -90,6 +90,7 @@ export function AppShell() {
               background: colorBgContainer,
               borderRight: '1px solid #f0f0f0',
               overflow: 'auto',
+              minHeight: 0,
             }}
           >
             <BuildingSidebar
@@ -110,6 +111,7 @@ export function AppShell() {
             background: '#f5f5f5',
             flex: 1,
             minWidth: 0,
+            minHeight: 0,
           }}
         >
           {isDevicesPage ? (
@@ -151,6 +153,7 @@ export function AppShell() {
               borderLeft: '1px solid #f0f0f0',
               padding: 16,
               overflow: 'hidden',
+              minHeight: 0,
             }}
           >
             <ChatSidebar

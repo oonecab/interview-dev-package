@@ -3,7 +3,7 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App, ConfigProvider } from 'antd';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { DeviceAlertPanel } from './DeviceAlertPanel';
+import { DeviceAlertPanel } from '../../../src/components/alerts/DeviceAlertPanel';
 
 // ---------- Wrapper ----------
 

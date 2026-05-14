@@ -3,8 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App, ConfigProvider } from 'antd';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { WorkOrderDetailDrawer } from './WorkOrderDetailDrawer';
-import type { WorkOrder } from '../../types/domain';
+import { WorkOrderDetailDrawer } from '../../../src/components/work-orders/WorkOrderDetailDrawer';
+import type { WorkOrder } from '../../../src/types/domain';
 
 // ---------- Wrapper ----------
 

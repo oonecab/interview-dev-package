@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { WorkOrderTable } from './WorkOrderTable';
-import type { WorkOrder } from '../../types/domain';
+import { WorkOrderTable } from '../../../src/components/work-orders/WorkOrderTable';
+import type { WorkOrder } from '../../../src/types/domain';
 
 const MOCK_WORK_ORDERS: WorkOrder[] = [
   {
@@ -28,6 +28,20 @@ const MOCK_WORK_ORDERS: WorkOrder[] = [
     updatedAt: '2026-04-15T09:00:00Z',
   },
 ];
+
+function makeWorkOrder(index: number): WorkOrder {
+  return {
+    id: `WO-${String(index).padStart(3, '0')}`,
+    title: `测试工单 ${index}`,
+    description: `测试描述 ${index}`,
+    deviceId: `device_${index}`,
+    deviceName: `设备_${index}`,
+    status: 'pending',
+    priority: 'medium',
+    createdAt: '2026-04-15T09:00:00Z',
+    updatedAt: '2026-04-15T09:00:00Z',
+  };
+}
 
 describe('WorkOrderTable', () => {
   it('renders work order status, priority, and device name', () => {
@@ -99,5 +113,27 @@ describe('WorkOrderTable', () => {
 
     // Ant Design Table shows a loading overlay
     expect(container.querySelector('.ant-spin')).toBeInTheDocument();
+  });
+
+  it('changes visible row count when page size changes', async () => {
+    const user = userEvent.setup();
+    const workOrders = Array.from({ length: 12 }, (_, idx) => makeWorkOrder(idx + 1));
+
+    render(
+      <WorkOrderTable
+        workOrders={workOrders}
+        loading={false}
+        onWorkOrderClick={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('测试工单 8')).toBeInTheDocument();
+    expect(screen.queryByText('测试工单 9')).toBeNull();
+
+    await user.click(screen.getByRole('combobox'));
+    await user.click(await screen.findByText('16 / page'));
+
+    expect(screen.getByText('测试工单 9')).toBeInTheDocument();
+    expect(screen.getByText('测试工单 12')).toBeInTheDocument();
   });
 });

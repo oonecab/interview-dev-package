@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { App, ConfigProvider } from 'antd';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ChatSidebar, type ChatDisplayMessage } from './ChatSidebar';
+import { ChatSidebar, type ChatDisplayMessage } from '../../../src/components/chat/ChatSidebar';
 
 // ---------- Wrapper ----------
 
@@ -286,6 +286,58 @@ describe('ChatSidebar', () => {
     expect(summaryEls.length).toBeGreaterThan(0);
   });
 
+  it('shows informational no-op message when creating work orders for an empty device set', async () => {
+    const calls: FetchCall[] = [];
+
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const urlStr = typeof input === 'string' ? input : input.toString();
+      calls.push({ url: urlStr, init });
+
+      if (urlStr.includes('/api/devices')) {
+        return Promise.resolve(okJson([]));
+      }
+
+      if (urlStr.includes('/api/work-orders')) {
+        return Promise.resolve(okJson({ error: 'should not create' }, 500));
+      }
+
+      if (urlStr.includes('/api/chat')) {
+        return Promise.resolve(okJson({
+          role: 'assistant',
+          content: null,
+          tool_calls: [{
+            id: 'call_empty_create',
+            type: 'function',
+            function: {
+              name: 'create_work_order',
+              arguments: '{"title":"新维修工单","description":"对B2栋出现故障的设备创建工单","deviceId":"","priority":"medium"}',
+            },
+          }],
+        }));
+      }
+
+      return Promise.resolve(okJson([]));
+    }) as typeof fetch;
+
+    const user = userEvent.setup();
+    const { onMessagesChange, rerender } = renderChatSidebar();
+
+    await user.type(screen.getByPlaceholderText('请输入问题...'), '对B2栋出现故障的设备创建工单');
+    await user.click(screen.getByRole('button', { name: '发送' }));
+
+    await waitFor(() => expect(onMessagesChange.mock.calls.length).toBeGreaterThanOrEqual(4));
+    rerender();
+
+    expect(screen.getByText('创建工单')).toBeInTheDocument();
+    expect(screen.getByText('成功')).toBeInTheDocument();
+    expect(screen.getByText('没有匹配设备，未创建工单')).toBeInTheDocument();
+    expect(screen.getByText('没有找到B2栋故障设备，因此没有创建工单。')).toBeInTheDocument();
+    expect(screen.queryByText(/工具调用全部失败/)).toBeNull();
+    expect(calls.some((c) => c.url.includes('/api/devices?') && c.url.includes('buildingId=B2') && c.url.includes('status=fault'))).toBe(true);
+    expect(calls.some((c) => c.url.includes('/api/work-orders'))).toBe(false);
+    expect(calls.filter((c) => c.url.includes('/api/chat'))).toHaveLength(1);
+  });
+
   it('executes query_alerts tool and shows final reply', async () => {
     globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const urlStr = typeof input === 'string' ? input : input.toString();
@@ -332,6 +384,177 @@ describe('ChatSidebar', () => {
     expect(screen.getByText('成功')).toBeInTheDocument();
     // Final assistant reply
     expect(screen.getByText('B1栋有1条告警：电梯_002门故障告警（警告）。')).toBeInTheDocument();
+  });
+
+  it('executes AI tool flow for every api-spec business endpoint', async () => {
+    const calls: FetchCall[] = [];
+
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const urlStr = typeof input === 'string' ? input : input.toString();
+      const url = new URL(urlStr);
+      calls.push({ url: urlStr, init });
+
+      if (url.pathname === '/api/chat') {
+        const body = init?.body ? JSON.parse(init.body as string) : null;
+        const hasTool = body?.messages?.some((m: { role: string }) => m.role === 'tool');
+        if (hasTool) {
+          return Promise.resolve(okJson({ role: 'assistant', content: '全部接口工具流程已完成。' }));
+        }
+        return Promise.resolve(okJson({
+          role: 'assistant',
+          content: null,
+          tool_calls: [
+            {
+              id: 'call_buildings',
+              type: 'function',
+              function: { name: 'query_buildings', arguments: '{}' },
+            },
+            {
+              id: 'call_devices',
+              type: 'function',
+              function: { name: 'query_devices', arguments: '{"buildingId":"B1","status":"fault"}' },
+            },
+            {
+              id: 'call_device_detail',
+              type: 'function',
+              function: { name: 'get_device_detail', arguments: '{"deviceId":"elevator_001"}' },
+            },
+            {
+              id: 'call_alerts',
+              type: 'function',
+              function: { name: 'query_alerts', arguments: '{"buildingId":"B1","acknowledged":false}' },
+            },
+            {
+              id: 'call_ack_alert',
+              type: 'function',
+              function: { name: 'ack_alert', arguments: '{"alertId":"alt_001"}' },
+            },
+            {
+              id: 'call_work_orders',
+              type: 'function',
+              function: { name: 'query_work_orders', arguments: '{"status":"pending"}' },
+            },
+            {
+              id: 'call_create_work_order',
+              type: 'function',
+              function: { name: 'create_work_order', arguments: '{"title":"测试工单","description":"给设备创建工单","deviceId":"elevator_001","priority":"high"}' },
+            },
+            {
+              id: 'call_update_work_order',
+              type: 'function',
+              function: { name: 'update_work_order', arguments: '{"workOrderId":"WO-011","status":"assigned"}' },
+            },
+          ],
+        }));
+      }
+
+      if (url.pathname === '/api/buildings') {
+        return Promise.resolve(okJson([
+          { id: 'B1', name: 'B1 栋', floors: 20, deviceCount: 32 },
+        ]));
+      }
+
+      if (url.pathname === '/api/devices/elevator_001') {
+        return Promise.resolve(okJson({
+          id: 'elevator_001',
+          name: '电梯_001',
+          type: 'elevator',
+          typeName: '电梯',
+          buildingId: 'B1',
+          floor: 8,
+          status: 'fault',
+          lastUpdated: '2026-04-15T10:00:00Z',
+          alerts: [],
+        }));
+      }
+
+      if (url.pathname === '/api/devices') {
+        return Promise.resolve(okJson([
+          { id: 'elevator_001', name: '电梯_001', type: 'elevator', typeName: '电梯', buildingId: 'B1', floor: 8, status: 'fault', lastUpdated: '2026-04-15T10:00:00Z' },
+        ]));
+      }
+
+      if (url.pathname === '/api/alerts/alt_001/ack' && init?.method === 'POST') {
+        return Promise.resolve(okJson({ id: 'alt_001', acknowledged: true }));
+      }
+
+      if (url.pathname === '/api/alerts') {
+        return Promise.resolve(okJson([
+          { id: 'alt_001', deviceId: 'elevator_001', deviceName: '电梯_001', buildingId: 'B1', level: 'warning', message: '门故障告警', timestamp: '2026-04-15T14:30:00Z', acknowledged: false },
+        ]));
+      }
+
+      if (url.pathname === '/api/work-orders/WO-011' && init?.method === 'PATCH') {
+        return Promise.resolve(okJson({
+          id: 'WO-011',
+          title: '测试工单',
+          description: '给设备创建工单',
+          deviceId: 'elevator_001',
+          deviceName: '电梯_001',
+          status: 'assigned',
+          priority: 'high',
+          createdAt: '2026-05-14T10:00:00Z',
+          updatedAt: '2026-05-14T10:10:00Z',
+        }));
+      }
+
+      if (url.pathname === '/api/work-orders' && init?.method === 'POST') {
+        return Promise.resolve(okJson({
+          id: 'WO-011',
+          title: '测试工单',
+          description: '给设备创建工单',
+          deviceId: 'elevator_001',
+          deviceName: '电梯_001',
+          status: 'pending',
+          priority: 'high',
+          createdAt: '2026-05-14T10:00:00Z',
+          updatedAt: '2026-05-14T10:00:00Z',
+        }, 201));
+      }
+
+      if (url.pathname === '/api/work-orders') {
+        return Promise.resolve(okJson([
+          {
+            id: 'WO-001',
+            title: '既有工单',
+            description: '待处理',
+            deviceId: 'elevator_001',
+            deviceName: '电梯_001',
+            status: 'pending',
+            priority: 'medium',
+            createdAt: '2026-05-14T09:00:00Z',
+            updatedAt: '2026-05-14T09:00:00Z',
+          },
+        ]));
+      }
+
+      return Promise.resolve(okJson({}));
+    }) as typeof fetch;
+
+    const user = userEvent.setup();
+    const { onMessagesChange, rerender } = renderChatSidebar();
+
+    await user.type(screen.getByPlaceholderText('请输入问题...'), '执行全接口工具流程');
+    await user.click(screen.getByRole('button', { name: '发送' }));
+
+    await waitFor(() => expect(onMessagesChange.mock.calls.length).toBeGreaterThanOrEqual(4));
+    rerender();
+
+    expect(screen.getByText('全部接口工具流程已完成。')).toBeInTheDocument();
+    expect(calls.some((c) => c.url.includes('/api/buildings'))).toBe(true);
+    expect(calls.some((c) => c.url.includes('/api/devices?') && c.url.includes('buildingId=B1') && c.url.includes('status=fault'))).toBe(true);
+    expect(calls.some((c) => c.url.includes('/api/devices/elevator_001'))).toBe(true);
+    expect(calls.some((c) => c.url.includes('/api/alerts?') && c.url.includes('buildingId=B1') && c.url.includes('acknowledged=false'))).toBe(true);
+    expect(calls.some((c) => c.url.includes('/api/alerts/alt_001/ack') && c.init?.method === 'POST')).toBe(true);
+    expect(calls.some((c) => c.url.includes('/api/work-orders?') && c.url.includes('status=pending'))).toBe(true);
+    expect(calls.some((c) => c.url.includes('/api/work-orders') && c.init?.method === 'POST')).toBe(true);
+    expect(calls.some((c) => c.url.includes('/api/work-orders/WO-011') && c.init?.method === 'PATCH')).toBe(true);
+
+    const chatCalls = calls.filter((c) => c.url.includes('/api/chat'));
+    expect(chatCalls).toHaveLength(2);
+    const secondChatBody = getRequestBody([chatCalls[1].url, chatCalls[1].init]);
+    const secondMessages = secondChatBody!.messages as Array<{ role: string }>;
+    expect(secondMessages.filter((m) => m.role === 'tool')).toHaveLength(8);
   });
 
   // ========== Tool error tests ==========

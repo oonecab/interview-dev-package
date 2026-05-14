@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { DeviceStats } from './DeviceStats';
-import type { Device } from '../../types/domain';
+import { DeviceStats } from '../../../src/components/devices/DeviceStats';
+import type { Device } from '../../../src/types/domain';
 
 const MIXED_DEVICES: Device[] = [
   { id: 'elevator_001', name: '电梯_001', type: 'elevator', typeName: '电梯', buildingId: 'B1', floor: 8, status: 'normal', lastUpdated: '2026-04-15T14:32:00Z' },

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildApiMessages, type ChatDisplayMessage } from './chatProtocol';
+import { buildApiMessages, type ChatDisplayMessage } from '../../../src/components/chat/chatProtocol';
 
 // ---------- Helpers ----------
 

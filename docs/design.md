@@ -12,6 +12,7 @@ src/components/
   alerts         — DeviceAlertPanel（告警面板，修复自 buggy-component.tsx）
   work-orders    — WorkOrderPage（工单管理容器）、WorkOrderTable（工单表格）、WorkOrderDetailDrawer（工单详情+流转）、CreateWorkOrderModal（创建工单表单）
   chat           — ChatSidebar（AI 聊天 UI）、toolExecutor（工具执行器）、chatProtocol（显示消息↔API 协议转换）
+tests/           — 自动化测试目录，按 src 模块镜像组织；setupTests.ts 统一放置 jsdom/Ant Design polyfill
 ```
 
 ## 状态管理方案
@@ -35,7 +36,8 @@ src/components/
 - 告警确认使用 `useMutation` + `queryClient.setQueryData` 不可变更新缓存。
 
 ### 工单管理（WorkOrderPage）
-- 状态筛选使用 React Query `queryKey: ['workOrders', statusFilter]`。
+- 工单列表一次拉取 `GET /api/work-orders` 的完整数组，在前端做本地搜索、状态筛选、优先级筛选和分页，避免扩展 mock server 接口。
+- 搜索覆盖工单编号、标题、描述、设备 ID、设备名称；筛选结果计数会和总数同时展示。
 - 状态流转通过 `getNextWorkOrderStatus` / `getWorkOrderStepIndex`（`utils/statusFlow.ts`）驱动 Ant Design Steps。
 - 创建工单成功后 `invalidateQueries(['workOrders'])` 刷新列表。
 
@@ -43,6 +45,8 @@ src/components/
 - `ChatDisplayMessage` 类型支持 `user` / `assistant` / `tool-status` 三种角色。
 - Tool Calling 流程：`用户输入 → POST /api/chat → tool_calls → 执行工具 → 追加 tool 消息 → 再次 POST /api/chat → 展示最终回复`。
 - `chatProtocol.ts` 负责从 `ChatDisplayMessage[]` 构建 `/api/chat` 请求的 `ChatMessage[]`，实现显示层和协议层的清晰分离。
+- `toolExecutor.ts` 覆盖 `api-spec.md` 中所有业务接口对应的工具：楼栋查询、设备列表、设备详情、告警查询、告警确认、工单查询、创建工单、更新工单。
+- `create_work_order` 增加参数兜底：当 LLM 返回空 `deviceId`，但用户描述中能推断楼栋/状态/类型时，先查询设备，再为匹配设备逐个创建工单；无法推断时返回参数提示，没有匹配设备时返回正常 no-op 提示，不会发送空 `deviceId` 的创建请求。
 
 ## Tool Calling 流程
 
@@ -57,9 +61,24 @@ src/components/
 4. `create_work_order` 成功后 `invalidateQueries(['workOrders'])`。
 5. 最多 2 轮 Tool Calling，超限提示用户。
 
+### 创建工单兜底流程
+
+针对“对 B1 栋出现故障的设备创建工单”这类没有明确设备 ID 的请求，mock LLM 可能返回：
+
+```json
+{
+  "name": "create_work_order",
+  "arguments": "{\"title\":\"新维修工单\",\"description\":\"对B1栋出现故障的设备创建工单\",\"deviceId\":\"\",\"priority\":\"medium\"}"
+}
+```
+
+前端不会直接把空 `deviceId` 提交给 `POST /api/work-orders`，而是从 `description` 推断 `{ buildingId: "B1", status: "fault" }`，先调用 `GET /api/devices`，再为返回的设备创建工单。这把不完整的 LLM 参数修正为可审计的 API 流程。
+
+如果查询结果为空，例如“对 B2 栋出现故障的设备创建工单”但 B2 没有故障设备，工具执行结果会被视为业务 no-op：状态卡片显示“没有匹配设备，未创建工单”，助手直接回复“没有找到 B2 栋故障设备，因此没有创建工单”，不会展示“工具调用全部失败”，也不会调用 `POST /api/work-orders`。
+
 ## 主要权衡
 
 - **React Query 的 refetchInterval vs 手动 setInterval**：选择前者，因为 React Query 自动处理组件卸载时的 timer 清理，且 `refetchInterval: false` 可以优雅停止，避免 buggy-component 的 timer 泄漏问题。
 - **chatProtocol 独立模块**：将 `buildApiMessages` 抽出可单独测试，确保工具调用的 assistant/tool 消息重建逻辑正确，不依赖 UI 渲染。
-- **测试策略**：优先覆盖纯逻辑（statusFlow、toolExecutor、chatProtocol、DeviceStats），其次覆盖核心交互（DeviceAlertPanel、CreateWorkOrderModal、WorkOrderDetailDrawer）。不追求高覆盖率，追求高价值覆盖。
+- **测试策略**：测试集中放在 `tests/` 目录，按 `src/` 模块镜像组织。优先覆盖纯逻辑（statusFlow、toolExecutor、chatProtocol、DeviceStats），其次覆盖核心交互（DeviceAlertPanel、CreateWorkOrderModal、WorkOrderDetailDrawer、ChatSidebar Tool Calling）。新增 AI 全接口流程测试，确保 `api-spec.md` 中每个业务接口都有对应工具链覆盖。
 - **错误处理**：统一 `getErrorMessage` 函数提取 ApiRequestError.serverMessage 优先于 Error.message，避免各组件重复内联判断。

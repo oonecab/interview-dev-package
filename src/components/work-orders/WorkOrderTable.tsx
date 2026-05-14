@@ -85,7 +85,12 @@ export function WorkOrderTable({ workOrders, loading, onWorkOrderClick, filterAc
       locale={{
         emptyText: filterActive ? '当前筛选条件下暂无工单' : '暂无工单',
       }}
-      pagination={false}
+      pagination={{
+        defaultPageSize: 8,
+        showSizeChanger: true,
+        pageSizeOptions: [8, 16, 32],
+        showTotal: (total, range) => `${range[0]}-${range[1]} / 共 ${total} 条`,
+      }}
       size="middle"
     />
   );

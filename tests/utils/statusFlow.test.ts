@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getNextWorkOrderStatus, getWorkOrderStepIndex } from './statusFlow';
-import type { WorkOrderStatus } from '../types/domain';
+import { getNextWorkOrderStatus, getWorkOrderStepIndex } from '../../src/utils/statusFlow';
+import type { WorkOrderStatus } from '../../src/types/domain';
 
 describe('getNextWorkOrderStatus', () => {
   it('returns assigned when given pending', () => {

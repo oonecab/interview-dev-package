@@ -64,6 +64,10 @@ src/
     work-orders/    # WorkOrderPage, WorkOrderTable, WorkOrderDetailDrawer, CreateWorkOrderModal
     chat/           # ChatSidebar, toolExecutor, chatProtocol
   pages/            # 页面组件（预留）
+tests/              # 自动化测试，按 src 模块镜像组织
+  components/       # 组件交互测试
+  utils/            # 纯逻辑测试
+  setupTests.ts     # Vitest / jsdom 测试环境配置
 attachments/        # 题目提供的 mock-server、api-spec、wireframes、buggy-component
 docs/               # 交付文档（设计说明、Bug 修复说明、AI 使用记录、自测清单）
 my_promopts/        # 分阶段 AI 提示词记录
@@ -85,7 +89,7 @@ my_promopts/        # 分阶段 AI 提示词记录
 |---|---|
 | 可运行前端项目 | 本仓库 |
 | Bug 修复说明 | `docs/bug-fixes.md` |
-| 单元测试 | `src/**/*.test.ts*`，共 54 个测试 |
+| 单元测试 | `tests/**/*.test.ts*`，共 68 个测试 |
 | 设计说明 | `docs/design.md` |
 | AI 工具使用记录 | `docs/ai-usage.md` |
 | 自测清单 | `docs/manual-checklist.md` |
