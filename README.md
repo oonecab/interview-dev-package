@@ -70,7 +70,8 @@ tests/              # 自动化测试，按 src 模块镜像组织
   setupTests.ts     # Vitest / jsdom 测试环境配置
 attachments/        # 题目提供的 mock-server、api-spec、wireframes、buggy-component
 docs/               # 交付文档（设计说明、Bug 修复说明、AI 使用记录、自测清单）
-my_promopts/        # 分阶段 AI 提示词记录
+milestone/          # 开发阶段划分与里程碑计划
+my_promopts/        # 交付给 Claude Code 的分阶段提示词记录
 ```
 
 ## 可用命令
